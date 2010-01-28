@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="BalusC File Servlet" default="dist">
+    <target name="clean">
+        <delete dir="build.ant"/>
+    </target>
+
+    <path id="build.classpath">
+        <fileset dir="lib">
+            <include name="**/*.jar"/>
+            <exclude name="**/*-sources.jar"/>
+            <exclude name="**/*-src.jar"/>
+        </fileset>
+    </path>
+
+    <target name="compile">
+        <mkdir dir="build.ant/main"/>
+        <javac destdir="build.ant/main" target="1.5" debug="true">
+            <src path="src/java/main"/>
+            <classpath refid="build.classpath"/>
+        </javac>
+    </target>
+
+    <target name="javadoc">
+        <delete dir="build.ant/javadoc"/>
+        <javadoc destdir="build.ant/javadoc">
+            <classpath refid="build.classpath" />
+            <packageset dir="src/java/main" defaultexcludes="yes"/>
+        </javadoc>
+        <echo message="Java documentation now available in build.ant/javadoc/index.html"/>
+    </target>
+
+    <target name="jar" depends="compile">
+        <delete file="build.ant/balusc_fileservlet.jar"/>
+        <jar destfile="build.ant/balusc_fileservlet.jar">
+            <fileset dir="build.ant/main"/>
+        </jar>
+    </target>
+
+    <target name="sources-jar" depends="compile">
+        <delete file="build.ant/balusc_fileservlet-sources.jar"/>
+        <jar destfile="build.ant/balusc_fileservlet-sources.jar">
+            <fileset dir="src/java/main"/>
+        </jar>
+    </target>
+
+    <target name="javadoc-jar" depends="javadoc">
+        <delete file="build.ant/balusc_fileservlet-javadoc.jar"/>
+        <jar destfile="build.ant/balusc_fileservlet-javadoc.jar">
+            <fileset dir="build.ant/javadoc"/>
+        </jar>
+    </target>
+
+    <target name="dist" depends="jar, sources-jar, javadoc-jar"
+      description="Create distributeable jars"/>
+
+</project>

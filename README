@@ -1,0 +1,124 @@
+Note: Please see http://balusc.blogspot.com/2009/02/fileservlet-supporting-resume-and.html for the latest details.
+
+Introduction
+
+In the almost 2 year old FileServlet and ImageServlet articles you can find
+basic examples of a download servlet and an image servlet. It does in fact
+nothing more than obtaining an InputStream of the desired resource/file and
+writing it to the OutputStream of the HTTP response along with a set of
+important response headers. It does not support resumes and effective caching
+of client side data.
+
+If one downloaded a big file and got network problems on 99% of the file, one
+wouldn't be happy to discover the need to download the complete file again
+after getting network back. If a browser decides to check the cached images for
+changes, it would send a HEAD request to determine under each the unique file
+identifier and its timestamp or it would send a conditional GET request to
+determine the response status. If the image isn't changed according to the
+server response, the client won't re-request the image again to save the
+network bandwidth and other efforts.
+
+You could leverage the task to a default servlet of the webcontainer/appserver
+you're using, but most of them doesn't implement all of the performance
+enhancements, so doesn't for example Tomcat's DefaultServlet support the
+Expires header.
+
+Resume downloads
+
+To enable download resumes, the server have to send at least the Accept-Ranges,
+ETag and Last-Modified response headers to the client along with the file.
+
+The Accept-Ranges response header with the value "bytes" informs the client
+that the server supports byte-range requests. With this the client could
+request for a specific byte range using the Range request header.
+
+The ETag response header should contain a value which represents an unique
+identifier of the file in question so that both the server and the client can
+identify the file. You can use a combination of the file name, file size and
+file modification timestap for this. Some servers hauls this combination
+through a MD5 function to get an unique 32 character hexadecimal string. But
+this is not necessarily unique because two different strings could generate the
+same MD5 hash, so we won't use it here. The client could resend the obtained
+ETag back to the server for validation using the If-Match or If-Range request
+headers.
+
+The Last-Modified response header should contain a date which represents the
+last modification timestamp of the file as it is at the server side. The client
+could resend the obtained timestamp back to the server for validation using the
+If-Unmodified-Since or If-Range request headers. Important note: keep in mind
+that the timestamp accuracy in server side Java is in milliseconds while the
+accurancy of the Last-Modified header is in seconds. In Java code you should
+add 1 second (1000ms) to the value of the If-* request headers to bridge this
+difference before validation.
+
+Whenever the client sends a partial GET request with a Range request header to
+the server, then server should intercept on the conditional GET request headers
+(all headers starting with If) and handle accordingly. Whenever the If-Match or
+If-Unmodified-Since conditions are negative, the server should send a 412
+"Precondition Failed" response back without any content. Whenever the If-Range
+condition is negative, then the server should ignore the Range header and send
+the full file back. Whenever the Range header is in invalid format, then the
+server should send a 416 "Requested Range Not Satisfiable" response back
+without any content.
+
+If a partial GET request with a valid Range header is sent by the client, then
+the server should send the specific byte range(s) back as a 206 "Partial
+Content" response.
+
+Client side caching
+
+The principle is the same as with resume downloads, with the only difference
+that no Range request header is been sent to the server. The server only have
+to check and validate any conditional GET request headers and respond
+accordingly. Usually those are the If-None-Match or If-Modified-Since request
+headers. The client could also send a HEAD request (for which the server should
+respond exactly like a GET, but completely without content) and determine the
+obtained ETag and Last-Modified response headers itself.
+
+Whenever the If-None-Match or If-Modified-Since conditions are positive, the
+server should send a 304 "Not Modified" response back without any content. If
+this happens, then the client is allowed to use the content which is already
+available in the client side cache.
+
+Further on you can use the Expires response header to inform the client how
+long to keep the content in the client side cache without firing any request
+about that, even no HEAD requests.
+
+GZIP compression
+
+To save more network bandwitch, we could compress text files (text/javascript,
+text/css, text/xml, text/csv, etcetera) with GZIP. Generally you can save up to
+70% of network bandwidth by compressing text files with GZIP. We only need to
+check if the client accepts GZIP encoding by checking if the Accept-Encoding
+header contains "gzip". If this is true, and the client is requesting the full
+file, then the full text file will be compressed. Statistics learn that about
+90% of the browsers supports GZIP.
+
+This may also be possible for all files other than text, but as it usually
+concerns images and another kinds of (large) binary files, it may unnecessarily
+generate too much overhead to (de)compress them.
+
+
+The Code
+
+OK, enough boring technical background blah, now on to the code!
+
+This fileservlet does everything what it should do based on the request headers
+as described above. It also supports multipart byte requests (the client could
+send multiple ranges commaseparated along with the Range header). The whole
+stuff is targeted on at least Java EE 5 and developed and tested in Eclipse 3.4
+with Tomcat 6. It is tested with different webbrowsers (FireFox2/3, IE6/7/8,
+Opera8/9, Safari2/3 and Chrome) and also with a plain vanilla Java Application
+using URLConnection.
+
+You can use it for any file types: binary files, text files, images, etcetera.
+When the requested file is a text file or an image or when its content type is
+covered by the Accept request header of the client, then it will be displayed
+inline, otherwise it will be sent as an attachment which will pop up a 'save
+as' dialogue.
+
+It's almost 485 lines of code of which the nearly half are less or more
+rudimentary due to comments (read them all though), long-code line breaks and
+blank lines. You can just copy'n'paste and run it. You're free to make changes
+whenever needed as long as it's not for commercial use.
+
